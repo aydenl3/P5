@@ -345,6 +345,14 @@ Individual = Individual_Grid
 
 def generate_successors(population):
     results = []
+    ## Ayden Note: This loop doesn't really do much besides find the right thing to add to results.
+    ## Population is a list of class objects called "individuals". generate_children is a function
+    # to be called on these individuals, which returns a tuple of new individuals. How we pick
+    # which children we want is unclear to me... 
+    for child in population:
+        a = child.generate_children(child)
+        for item in a:
+            results.append(item)
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
     return results
@@ -384,7 +392,7 @@ def ga():
                     print("Max fitness:", str(best.fitness()))
                     print("Average generation time:", (now - start) / generation)
                     print("Net time:", now - start)
-                    with open("levels/last.txt", 'w') as f:
+                    with open("levels/last.txt", 'w+') as f:
                         for row in best.to_level():
                             f.write("".join(row) + "\n")
                 generation += 1
