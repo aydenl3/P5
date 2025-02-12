@@ -3,13 +3,17 @@
 Improved GA for Evolving Mario Levels – Grid Encoding Version
 
 This version includes:
-  - Structured initialization that produces a level with a fixed, solid ground and mostly empty space above.
+  - Structured initialization that produces a level with a fixed, continuous ground.
+    The ground is generated with a smooth mountain profile (climbable steps, never floating)
+    and with a maximum vertical difference of 4 blocks.
+  - Floating platforms are placed either 2 rows above the ground or, if designated as a
+    "question platform," 4 rows above the ground so that Mario can headbut it.
   - A mutation operator that only changes certain tiles (leaving the ground intact).
   - A multi-point column crossover to preserve horizontal structures.
   - Fixed positions for Mario’s start, flagpole, and flag.
-  - Ensured tube (pipe) elements are always connected to the ground.
-  - Increased enemy placement.
-  - Adjusted fitness coefficients (and added an enemy bonus) to drive higher max fitness.
+  - Tubes (pipes) are always connected to the ground.
+  - Enemies and coins are added in fixed amounts.
+  - Each generation’s best level is saved to a file named with its generation number.
   
 Switch between the Grid and DE encodings by adjusting the 'Individual' assignment below.
 """
@@ -24,23 +28,46 @@ import time
 import math
 
 # --------------------------
-# CONFIGURATION PARAMETERS
+# HARD-WIRED PARAMETERS
 # --------------------------
 WIDTH = 200
 HEIGHT = 16
 POPULATION_SIZE = 480
-NUM_GENERATIONS = 20
-MUTATION_RATE = 0.05        # probability of mutating a tile (for grid encoding)
-TOURNAMENT_SIZE = 3         # number of individuals for tournament selection
-SELECTION_METHOD = "mixed"  # options: "tournament", "roulette", "mixed"
+NUM_GENERATIONS = 10
+MUTATION_RATE = 0.05         # probability of mutating a tile (for grid encoding)
+TOURNAMENT_SIZE = 3          # number of individuals for tournament selection
+SELECTION_METHOD = "mixed"   # options: "tournament", "roulette", "mixed"
 OUTPUT_DIR = "levels"
 
-# Only allow mutations on these tile types.
-ALLOWED_MUTATION_TILES = ["-", "o", "X", "B"]
-
-# These are the overall tile options (for placing new tiles in mutation)
-# (Note: '?' and 'M' are left out in mutation to preserve structure.)
+# Allowed tiles for mutation.
+ALLOWED_MUTATION_TILES = ["-", "o", "X", "B"]  # "?" is intentionally omitted from mutation.
 OPTIONS = ["-", "X", "B", "o"]
+
+# Parameters for ground (mountain) generation.
+START_FLAT_COLS = 5
+# With bottom at HEIGHT-1, use HEIGHT-5 so that the maximum vertical difference is 4 blocks.
+MIN_GROUND_HEIGHT = HEIGHT - 5
+
+# Parameters for floating platforms.
+PLATFORM_COUNT_MIN = 2
+PLATFORM_COUNT_MAX = 3
+PLATFORM_LENGTH_MIN = 3
+PLATFORM_LENGTH_MAX = 7
+# Floating platforms will be anchored exactly 2 rows above the lowest ground for a normal platform,
+# or 4 rows above for a "question platform" (so Mario can headbut it).
+
+# Parameters for coins.
+COIN_COUNT_MIN = 5
+COIN_COUNT_MAX = 10
+
+# Parameters for enemies.
+ENEMY_COUNT_MIN = 3
+ENEMY_COUNT_MAX = 7
+
+# Parameters for tubes (pipes).
+TUBE_PROBABILITY = 0.3       # 30% chance to add a tube per level.
+TUBE_HEIGHT_MIN = 2
+TUBE_HEIGHT_MAX = 4
 
 # --------------------------
 # GRID ENCODING DEFINITION
@@ -55,17 +82,16 @@ class Individual_Grid(object):
 
     def calculate_fitness(self):
         measurements = metrics.metrics(self.to_level())
-        # Increase the solvability coefficient to boost fitness of playable levels.
         coefficients = {
             "meaningfulJumpVariance": 0.5,
             "negativeSpace": 0.6,
             "pathPercentage": 0.5,
             "emptyPercentage": 0.6,
             "linearity": -0.5,
-            "solvability": 3.0,  # increased from 2.0 to 3.0
+            "solvability": 3.0,
         }
         base_fitness = sum(coefficients[m] * measurements[m] for m in coefficients)
-        # Bonus: if at least one enemy ("E") is present, add a small bonus.
+        # Bonus if at least one enemy ("E") is present.
         level_str = "".join("".join(row) for row in self.to_level())
         enemy_bonus = 0.5 if "E" in level_str else 0.0
         self._fitness = base_fitness + enemy_bonus
@@ -79,29 +105,23 @@ class Individual_Grid(object):
     # --- Mutation Operator ---
     # Only mutate rows 0..HEIGHT-2 (leave the ground intact).
     def mutate(self, genome):
-        for y in range(HEIGHT - 1):  # do not change the bottom (ground) row
-            for x in range(1, WIDTH - 1):  # leave leftmost and rightmost columns unchanged
+        for y in range(HEIGHT - 1):
+            for x in range(1, WIDTH - 1):
                 if random.random() < MUTATION_RATE:
                     if genome[y][x] in ALLOWED_MUTATION_TILES:
-                        new_tile = random.choice(ALLOWED_MUTATION_TILES)
-                        genome[y][x] = new_tile
+                        genome[y][x] = random.choice(ALLOWED_MUTATION_TILES)
         return genome
 
     # --- Multi-Point Column Crossover ---
     def generate_children(self, other):
         new_genome1 = copy.deepcopy(self.genome)
         new_genome2 = copy.deepcopy(self.genome)
-
-        # Choose 2 to 5 random columns (except the borders) to swap between parents.
         crossover_points = random.randint(2, 5)
         columns = random.sample(range(1, WIDTH - 1), crossover_points)
         for x in columns:
-            # Swap the entire column for all rows except the ground row.
-            for y in range(HEIGHT - 1):  # Skip the ground row to preserve it.
+            for y in range(HEIGHT - 1):  # Skip the ground row.
                 new_genome1[y][x] = other.genome[y][x]
                 new_genome2[y][x] = self.genome[y][x]
-
-        # Apply mutation
         new_genome1 = self.mutate(new_genome1)
         new_genome2 = self.mutate(new_genome2)
         return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
@@ -112,84 +132,114 @@ class Individual_Grid(object):
     # --- Structured Empty Individual ---
     @classmethod
     def empty_individual(cls):
-        # Create an empty grid with a solid ground (all "X" in the bottom row).
         g = []
         for row in range(HEIGHT):
             if row == HEIGHT - 1:
                 g.append(["X"] * WIDTH)
             else:
                 g.append(["-"] * WIDTH)
-        # Fix special positions:
         if HEIGHT >= 2:
-            g[HEIGHT - 2][0] = "m"  # Mario's start
+            g[HEIGHT - 2][0] = "m"  # Mario's start.
         if HEIGHT > 7:
-            g[7][-1] = "v"        # Flagpole
+            g[7][-1] = "v"       # Flagpole.
         for row in range(8, min(14, HEIGHT)):
-            g[row][-1] = "f"        # Flag
+            g[row][-1] = "f"       # Flag.
         for row in range(14, HEIGHT):
             g[row][-1] = "X"
         return cls(g)
 
-    # --- Structured Random Individual ---
+    # --- Structured Random Individual with Clean Ground and Floating Platforms ---
     @classmethod
     def random_individual(cls):
-        # Start with a level that has a flat, solid ground and clear sky.
-        ind = cls.empty_individual()
-        g = copy.deepcopy(ind.genome)
-        
-        # Add horizontal platforms for Mario to jump on.
-        num_platforms = random.randint(3, 7)
+        # Create an empty grid.
+        grid = [["-"] * WIDTH for _ in range(HEIGHT)]
+        ground_heights = [None] * WIDTH
+
+        # Force the first few columns to be flat for Mario's start.
+        for col in range(START_FLAT_COLS):
+            ground_heights[col] = HEIGHT - 1
+
+        # Generate a ground profile for columns START_FLAT_COLS..WIDTH-1.
+        current_height = HEIGHT - 1
+        for col in range(START_FLAT_COLS, WIDTH):
+            step = random.choice([-1, 0, 1])
+            new_height = current_height + step
+            new_height = max(MIN_GROUND_HEIGHT, min(new_height, HEIGHT - 1))
+            ground_heights[col] = new_height
+            current_height = new_height
+
+        # Fill in the ground.
+        for col in range(WIDTH):
+            for row in range(ground_heights[col], HEIGHT):
+                grid[row][col] = "X"
+
+        # --- Add Floating Platforms ---
+        # For each platform, decide whether it is a question platform.
+        num_platforms = random.randint(PLATFORM_COUNT_MIN, PLATFORM_COUNT_MAX)
         for _ in range(num_platforms):
-            platform_length = random.randint(3, 7)
-            start_col = random.randint(5, WIDTH - platform_length - 5)
-            platform_row = random.randint(3, HEIGHT - 6)
+            platform_length = random.randint(PLATFORM_LENGTH_MIN, PLATFORM_LENGTH_MAX)
+            start_col = random.randint(START_FLAT_COLS, WIDTH - platform_length - 5)
+            local_min = min(ground_heights[x] for x in range(start_col, start_col + platform_length))
+            # Decide platform type: 33% chance to be a question platform.
+            if random.random() < 0.33:
+                # For a question platform, set the platform 4 rows above the lowest ground.
+                platform_row = local_min - 4
+            else:
+                platform_row = local_min - 2
+            if platform_row < 2 or platform_row >= HEIGHT - 6:
+                continue
             for x in range(start_col, start_col + platform_length):
-                if g[platform_row][x] == "-":
-                    g[platform_row][x] = random.choice(["X", "B"])
-        
-        # (Removed gap creation code so that the floor remains solid.)
-        
-        # Add coins in the sky.
-        num_coins = random.randint(5, 10)
+                if grid[platform_row][x] == "-":
+                    # If this platform is a question platform, force "?".
+                    if platform_row == local_min - 4:
+                        grid[platform_row][x] = "?"
+                    else:
+                        grid[platform_row][x] = random.choice(["X", "B"])
+
+        # --- Add Coins ---
+        num_coins = random.randint(COIN_COUNT_MIN, COIN_COUNT_MAX)
         for _ in range(num_coins):
-            coin_row = random.randint(1, HEIGHT - 3)
-            coin_col = random.randint(1, WIDTH - 2)
-            if g[coin_row][coin_col] == "-":
-                g[coin_row][coin_col] = "o"
-        
-        # Add random enemies on the ground (increase count).
-        num_enemies = random.randint(3, 7)
+            col = random.randint(1, WIDTH - 2)
+            if ground_heights[col] > 2:
+                coin_row = random.randint(1, ground_heights[col] - 2)
+                if grid[coin_row][col] == "-":
+                    grid[coin_row][col] = "o"
+
+        # --- Add Enemies ---
+        num_enemies = random.randint(ENEMY_COUNT_MIN, ENEMY_COUNT_MAX)
         for _ in range(num_enemies):
-            enemy_col = random.randint(2, WIDTH - 3)
-            enemy_row = HEIGHT - 2  # Just above the ground.
-            g[enemy_row][enemy_col] = "E"
-        
-        # Add a tube (pipe) that is always connected to the ground.
-        if random.random() < 0.3:  # 30% chance to add a tube.
+            col = random.randint(2, WIDTH - 3)
+            enemy_row = ground_heights[col] - 1
+            if enemy_row >= 0:
+                grid[enemy_row][col] = "E"
+
+        # --- Add a Tube (Pipe) ---
+        if random.random() < TUBE_PROBABILITY:
             tube_col = random.randint(2, WIDTH - 3)
-            tube_height = random.randint(2, 4)
-            # Ensure tube's bottom touches the ground.
-            tube_top_row = HEIGHT - tube_height - 1
-            g[tube_top_row][tube_col] = "T"
-            for row in range(tube_top_row + 1, HEIGHT):
-                g[row][tube_col] = "|"
-        
-        # Fix special positions again to avoid overwrites.
+            tube_height = random.randint(TUBE_HEIGHT_MIN, TUBE_HEIGHT_MAX)
+            ground = ground_heights[tube_col]
+            if ground - tube_height >= 0:
+                tube_top = ground - tube_height
+                grid[tube_top][tube_col] = "T"
+                for row in range(tube_top + 1, ground):
+                    grid[row][tube_col] = "|"
+
+        # --- Fix Special Positions ---
         if HEIGHT >= 2:
-            g[HEIGHT - 2][0] = "m"
+            grid[HEIGHT - 2][0] = "m"
         if HEIGHT > 7:
-            g[7][-1] = "v"
+            grid[7][-1] = "v"
         for row in range(8, min(14, HEIGHT)):
-            g[row][-1] = "f"
+            grid[row][-1] = "f"
         for row in range(14, HEIGHT):
-            g[row][-1] = "X"
-        
-        return cls(g)
+            grid[row][-1] = "X"
+
+        return cls(grid)
 
 # --------------------------
 # DESIGN ELEMENT (DE) ENCODING DEFINITION
 # --------------------------
-# (The DE encoding is left unchanged; you can modify it similarly if needed.)
+# (Unchanged; modify as needed.)
 class Individual_DE(object):
     __slots__ = ["genome", "_fitness", "_level"]
 
@@ -303,11 +353,9 @@ class Individual_DE(object):
         a_part = self.genome[:pa] if self.genome else []
         b_part = other.genome[pb:] if other.genome else []
         child1_genome = a_part + b_part
-
         b_part = other.genome[:pb] if other.genome else []
         a_part = self.genome[pa:] if self.genome else []
         child2_genome = b_part + a_part
-
         return Individual_DE(self.mutate(child1_genome)), Individual_DE(self.mutate(child2_genome))
 
     def to_level(self):
@@ -379,7 +427,6 @@ class Individual_DE(object):
 # --------------------------
 # Choose the Encoding
 # --------------------------
-# Uncomment the following line to use Grid encoding.
 Individual = Individual_Grid  
 # To use the design element encoding, comment out the above line and uncomment:
 # Individual = Individual_DE
@@ -402,7 +449,6 @@ def clip(lo, val, hi):
 # SELECTION STRATEGIES
 # --------------------------
 def tournament_selection(population, k=TOURNAMENT_SIZE):
-    # Sample k candidates and ensure uniqueness based on genome string representation.
     candidates = random.sample(population, k)
     unique_candidates = list({''.join(''.join(row) for row in ind.to_level()): ind for ind in candidates}.values())
     return max(unique_candidates, key=lambda ind: ind.fitness())
@@ -434,12 +480,9 @@ def select_parent(population):
 # Generate Successors with Elitism
 # --------------------------
 def generate_successors(population):
-    # Use elitism: carry over the best individual unchanged.
-    elite_count = 1
+    elite_count = 2
     sorted_pop = sorted(population, key=lambda ind: ind.fitness(), reverse=True)
     new_population = sorted_pop[:elite_count]
-    
-    # Fill the rest of the population by generating children.
     while len(new_population) < len(population):
         parent1 = select_parent(population)
         parent2 = select_parent(population)
@@ -457,12 +500,10 @@ def generate_successors(population):
 def ga():
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
-
     batches = os.cpu_count()
     if POPULATION_SIZE % batches != 0:
         print("It is ideal if POPULATION_SIZE divides evenly into", batches, "batches.")
     batch_size = int(math.ceil(POPULATION_SIZE / batches))
-
     with mpool.Pool(processes=os.cpu_count()) as pool:
         init_time = time.time()
         population = [Individual.random_individual() if random.random() < 0.9
@@ -471,38 +512,33 @@ def ga():
         population = pool.map(Individual.calculate_fitness, population, batch_size)
         init_done = time.time()
         print("Initial population created and evaluated in: {:.2f} seconds".format(init_done - init_time))
-
         generation = 0
         start = time.time()
         best_overall = None
         stagnation_count = 0
         prev_best_fitness = -1
-
         while generation < NUM_GENERATIONS:
             now = time.time()
             best = max(population, key=lambda ind: ind.fitness())
             if best_overall is None or best.fitness() > best_overall.fitness():
                 best_overall = best
-
             if abs(best.fitness() - prev_best_fitness) < 0.01:
                 stagnation_count += 1
             else:
                 stagnation_count = 0
             prev_best_fitness = best.fitness()
-
             if stagnation_count >= 10:
                 print("Early stopping: No fitness improvement for 10 generations.")
                 break
-
             print("\nGeneration:", generation)
             print("Max fitness:", best.fitness())
             print("Average generation time: {:.2f} sec".format((now - start) / (generation + 1)))
             print("Net time: {:.2f} sec".format(now - start))
-
-            with open(os.path.join(OUTPUT_DIR, "last.txt"), 'w') as f:
+            # Save the best level for this generation to a file named "gen_<generation>.txt".
+            gen_filename = os.path.join(OUTPUT_DIR, f"gen_{generation}.txt")
+            with open(gen_filename, 'w') as f:
                 for row in best.to_level():
                     f.write("".join(row) + "\n")
-
             generation += 1
             gentime = time.time()
             next_population = generate_successors(population)
@@ -512,7 +548,6 @@ def ga():
             popdone = time.time()
             print("Calculated fitnesses in: {:.2f} seconds".format(popdone - gendone))
             population = next_population
-
         return population, best_overall
 
 # --------------------------
@@ -524,7 +559,7 @@ if __name__ == "__main__":
     print("\nBest overall fitness:", best_individual.fitness())
     now_str = time.strftime("%m_%d_%H_%M_%S")
     for k in range(min(10, len(final_sorted))):
-        filename = os.path.join(OUTPUT_DIR, "{}_{}.txt".format(now_str, k))
+        filename = os.path.join(OUTPUT_DIR, f"{now_str}_{k}.txt")
         with open(filename, 'w') as f:
             for row in final_sorted[k].to_level():
                 f.write("".join(row) + "\n")
