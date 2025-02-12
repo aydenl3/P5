@@ -1,0 +1,16 @@
+-oX-o-oXo-X--X-XBXoX-XB-o---X--B-B--XXXB-X-B-XXB-o--XXX-B-BoXoXX-Booo---BoXXX-XB-oB--BX----XoX-oBXoo-X-B-XooB---BBB-o-X--XBX---o-XX-o-Bo--oo-X--Bo-oXXBXXoXXoX-X--B--XBBXoB-BBBB-BoBoo-XBXBXB-Bo-BBXo-X-
+-Bo-BoB-XBX-XXXo---X-BB-oXBoooX-X-B-oXBBoBBXoXoXBBoX-B-BB-XB-oBXoBX-XXBo-oXXXo-B-X-oo-oo-B-oXXXo-X--XooBoo-B-X--BX--o-o-o-XX---XB-X---BB-BB---oX-Xoo-BoBBo-o--X-BBoB-Xoo-o-BBooXXX-Boo--BB----Xoo---o-X-
+---BoXBXBXBoBBo-BBX----BoBXoBX-Bo---o-oooX-ooXB--oXooB--BXB-o-X-XB--XBXo--oooBB-oBoX-o-XBB-o--BXo--B---oB-BoBXoX-oXXXXB-o-X--XXX-XoBXBX-o-X--X--B--XB---B--o--BXBXB-oX-XB-X---oBXoB-oXXoB-X-oooo--oXB-B-
+-XBXoB-ooBoB--oB---XBB--oX-ooBoBXX-XX-XXB---XB--B--o-B-X--oooBXo-oB-ooBXoBooooo--Xo-----BXX-X-X---X-BB-XXXB--BoBo-XB-Xo--BoBoBo-XX-oo-Bo-BoXBo---Boo-o-X-BBoBoXo-Xoo--XBoB---oX-BX-XooXoBB-BX-BXXXoXBX--
+--XXXo-XXX--Xoo--oBoXo-BoooBXB-B-B----XX-o---XXXooB-B-o-BX-oo-BB-BoBBB---XBBoooB--oB-oBBo--o-oBoXB--BoBB--Bo-Xo-X-XBBBBooo--ooX--BXooo-oX--B-X----oXB-o-Bo-XBo-oX-oBooo-oB-o--BBB-o-XBB--ooXX----BoBBoB-
+-XoBB-o--B-XXBX-oX-X----BoXXXo---o-o---XooB-XXXoBo-ooXXXooX----o-ooXXBo-BBo-oXo-oBBXBXBB-B-Xo-BXBBB-X-XBooBXBX-Xo---BBX-XBBBoo--ooXo-oB--XoBBX-BBX--o-oB--oBo-o-XXBBX-oBXBBoooooXXB---oo--oXBoBoXB------
+--XB-Xo-X-oXoBXBXo---oB--XXo-B--oXBBX-oB-oXB-XX-oo-XBX-BXo--o-XoBX-oo-XoBBo--XXoBXoo--BB-oXXBBXB-B-BXXXB-o-B-oo-oooo-X-B-XXBoooBX-oo---XB-ooXX-XoBoBBooX-o-B-oXXBXo-BX-o---B-BBoB--BXo-ooBXXo-X-B--BBo--
+-BB-XBoo-oXB-BoBo---XX--X--Bo-ooo-o-BXo--B------X--B-o-XoB-XBXo-oB-BX-ooBXoXooo--XXX--X-oo--BBXo----B-o--B-o---BoooXX-o-XoXoBoBoBoo---XoX-oB-XXoBXXBXB-B---o-oo-X-BoooBBX--BXXoB---B-oXoB---oBBXBo-X--Bv
+-oX---o---BB----oXBX-Xo----BXB-oBB---BXBXXB-BoBXXBoB--oXoooBoX-o-ooBBBXX-BB-BX--ooooooBXBoBoBoXXBXo----XXX--XXBXo--XB-oBXo-B-Xo--ooXX--B-XooXX---Boo-B---XoXBXoXo-Bo-oo-ooooX--XoBB-ooXXXXoB----BB--XXBf
+-BoX-BoXBoXX-XXXBooBooB-o-BXo--o-Bo-----B---BXXX-B-XXX--oXB---BX--BoooXoB-X--oo-BoX-XoXo---B--XBXBXoBoB-Xoo----B--oXooXX-XBoBBXo-B-XX-XBB-BBoBo---B-oo--o-BBXXB--BXB--XB-Xo--BB-BB--XBoBB-B-BBoooBX-XoXf
+-Xo--BBoBBXoBX-X---Xo-oo---oXBXX-o---XX-B---BX-XooXo--o---XoBXBXX-Bo--XBXB---oBoBoXX-o-o-B-BB-o---B-XX-BX-X-oB-B-X--B--oo-oo--XXooBXoXBoo-oB--BX---B----oooXX-o--XB--oXoXo--XXBoBBXBBXXX-ooXo--XoX-XoBXf
+-Xoo-BXBBo-XBo-BXo-BB-BB-oXooBBX-ooXX-B--B-BXBo-BXBXoXXX-oXoBXoo-X-o-oXoooXo-XXoX-o-XoBo-XX--BX-o-oB--XooBX-o-X-XB-X-X--XXXB-oXXXXBoXoXB-X-BB--XoX-XXX-B-XBBBo-BBoBX---o--o-o-o-o--o-oXX-XXBoX--BBoBX-of
+-BXo-oXBoBX--Xo-BB-X--oXBXooB-----o-BBo-o-XXB-BoBX-Xo--Xo-o-X---X-o--oo-o-BoX-o-BXXXBoXBB--BoXX-oBXoX-Xo-BBB-oXXBBooXooo-oXoX-XXBoooB---BXoXoB-X-XX-BXXo-oooBX-o-XBoX--X--X-XXoo--BBo-X----ooXo-o-o--BBf
+-B-X-BB-oXo-oXo-XXXB-BXB--XoXBXo-BoXoo-XBXoooBX--XooBoBBo-oXXXB-XX-o-o-XBBoXoBXB-BXBooBX-oooBo-oBB-Bo--BX-Bo-BXXo-oooXX-oBXoB-oooXoBXoBoXBBoXoX-oX--XXXo----B-B-o-o-oBXB-Xo-BXXB--XoX-X----oXX---XX--XBf
+mo-oBE-B--oBoXBoBXBBoo-XoBBBo-oB-Bo-o--XXo--BEoB-XBBXB--oBo-BXX-XXooXoB-BBBXo-BX-o-BoXB-X-BoX-X-ooBBB-B-BXBoBo-Bo-XXoXX-XBBBXoBoo-BoBBBo--B-o--XXBXX-XBB-X--Bo-XB----BXB--Xooo-XXX--o---BoBEB-o-Eo--XB-X
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX----XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX--XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX---XXXXXXX

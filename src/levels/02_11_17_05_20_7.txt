@@ -1,0 +1,16 @@
+-o-----XB------X------------B-X-------------X-----B-----B--B----X---------------------X---------------------------X-----X-------X-B------X--X---o-o-----------B--X------B-B-----o--B-----------------B--
+-B-B-X----------B--------BX------o-----------BoB-X-----------B--o-------o-o--o---XB--X--o---B---------------B---------B-----o--o---o-----B----o--B------X-X------------o---------B----X----------o------
+---o-B---B--X-B-B-------B-B-----X-B-------------X------X------X--B--------o--X------------B---------------Bo------BXX-o----------------o--o-----------------------------B-----X-X------X-------X------B-
+-B-------Xo---------X-X---B-------X-o------------------X---------------------------------B-----------B--------X------------B-----o------X--oX----B-X---------Bo-----X-X--BX-----X----------------B---BX-
+---o-B-X-----B-BB-oXXB-Bo----------o-X---X--BX-----XoBo-B--B------o--B--X-------------------X--o--------B--B---X--o----Xo------------B-o--B----X--B--------X-----o-----X------------ooB-X-X---------oB--
+-----Bo-o--BX----oB---------------------B-----------------------o----X-XX-o---X---o----------X----X-----X---------oo--o----X---------oB---------X-----------X----------oBB------X--X---X---------Xo--B--
+-------X----o-------Xo----o-----B-o--B--------X------------------X---o-B--o--o--X------------B--------------B-B-----------o-------Xo-X-X------B-------XX-----------X---XX---XX-o--B-o-----B--X----X-----
+-----------o-X-o-o------------o-----B--X---X---X--------B--B---XX-------B------X-----X-------o-----B--------o---------B--XX-----B--BB---o-----X--B-X-B-BX-o-----X--B----XXX------X--o---------oo-------v
+----B---o-------o-------X-o-o--------o--X------------------o------X-----------X---XX-------------o----B---B-B---------o----------------B--X--XB------o------B-B-----o---------o---------------o-----o--f
+--BXX-oXB-o------X---------X----B-o---------o-o---------------------XB---------------X---B----B-o-----X---------------o-----X--X---XB--------X--X-----Xo-----------BX--ooBXXX-----B-B---X--Bo------o---f
+----------------o--o-------------X-----X---------X---------X-o--o-----B------Bo----o-BXB-------------------BB-----oX--X------------------B--X---BX--X----o-o-----o-------X---o----B-----X---B----------f
+----B------o-X---X--X-o-o-B------o---B---Boo----B----o---X----oB----------oo--------o------B------BX--X---B-X-----------X-----XB----B-----------o-X-o------------B---XX-----B--------------Bo----------f
+--B--------X---------------B-------------oB-----B-B-B-----o-----X-----XB-----X---------------o--------------XXXXoB---X-----X-------o--B---o-------o------X-X-----B---o--B---------B------B-------X-oo--f
+mXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXf
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
