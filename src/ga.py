@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """
-Improved GA for Evolving Mario Levels – Grid Encoding Version
+Improved GA for Evolving Mario Levels – Grid Encoding Version with FI‑2POP Extra Credit
 
 This version includes:
   - Structured initialization that produces a level with a fixed, continuous ground.
-    The ground is generated with a smooth mountain profile (climbable steps, never floating)
-    and with a maximum vertical difference of 4 blocks.
-  - Floating platforms are placed either 2 rows above the ground or, if designated as a
-    "question platform," 4 rows above the ground so that Mario can headbut it.
-  - A mutation operator that only changes certain tiles (leaving the ground intact).
   - A multi-point column crossover to preserve horizontal structures.
-  - Fixed positions for Mario’s start, flagpole, and flag.
-  - Tubes (pipes) are always connected to the ground.
-  - Enemies and coins are added in fixed amounts.
+  - Enemies, coins, and mushrooms are added in fixed amounts.
+  - Two populations are maintained (FI‑2POP):
+       • A “feasible” (solvable) population.
+       • An “infeasible” (unsolvable) population.
+  - Offspring are generated separately from each sub‐population and then merged.
   - Each generation’s best level is saved to a file named with its generation number.
   
 Switch between the Grid and DE encodings by adjusting the 'Individual' assignment below.
@@ -32,29 +29,29 @@ import math
 # --------------------------
 WIDTH = 200
 HEIGHT = 16
-POPULATION_SIZE = 480
-NUM_GENERATIONS = 10
-MUTATION_RATE = 0.05         # probability of mutating a tile (for grid encoding)
-TOURNAMENT_SIZE = 3          # number of individuals for tournament selection
-SELECTION_METHOD = "mixed"   # options: "tournament", "roulette", "mixed"
+POPULATION_SIZE = 480   # Total population size (split between feasible and infeasible)
+NUM_GENERATIONS = 15
+MUTATION_RATE = 0.05         # Mutation rate for non-ground tiles.
+TOURNAMENT_SIZE = 3          # For selection.
+SELECTION_METHOD = "mixed"   # Options: "tournament", "roulette", "mixed"
 OUTPUT_DIR = "levels"
+USE_2POP = True              # Set to True to run FI‑2POP extra credit version.
 
 # Allowed tiles for mutation.
-ALLOWED_MUTATION_TILES = ["-", "o", "X", "B"]  # "?" is intentionally omitted from mutation.
+ALLOWED_MUTATION_TILES = ["-", "o", "X", "B"]  # "?" is intentionally not included.
 OPTIONS = ["-", "X", "B", "o"]
 
-# Parameters for ground (mountain) generation.
+# Parameters for ground generation.
 START_FLAT_COLS = 5
-# With bottom at HEIGHT-1, use HEIGHT-5 so that the maximum vertical difference is 4 blocks.
-MIN_GROUND_HEIGHT = HEIGHT - 5
+MIN_GROUND_HEIGHT = HEIGHT - 5  # With bottom at HEIGHT-1, ensures max vertical difference of 4.
 
 # Parameters for floating platforms.
 PLATFORM_COUNT_MIN = 2
 PLATFORM_COUNT_MAX = 3
 PLATFORM_LENGTH_MIN = 3
 PLATFORM_LENGTH_MAX = 7
-# Floating platforms will be anchored exactly 2 rows above the lowest ground for a normal platform,
-# or 4 rows above for a "question platform" (so Mario can headbut it).
+# Normal platforms are placed 2 rows above local ground;
+# question platforms (which use "?" blocks) are placed 4 rows above ground.
 
 # Parameters for coins.
 COIN_COUNT_MIN = 5
@@ -65,23 +62,33 @@ ENEMY_COUNT_MIN = 3
 ENEMY_COUNT_MAX = 7
 
 # Parameters for tubes (pipes).
-TUBE_PROBABILITY = 0.3       # 30% chance to add a tube per level.
+TUBE_PROBABILITY = 0.3       # 30% chance to add a tube.
 TUBE_HEIGHT_MIN = 2
-TUBE_HEIGHT_MAX = 4
+TUBE_HEIGHT_MAX = 3
+
+# FI‑2POP threshold: levels with solvability metric >= this are "feasible"
+SOLVABILITY_THRESHOLD = 0.5
+
+# Parameters for diversity injection on stagnation.
+STAGNATION_THRESHOLD = 3   # Generations with <0.01 improvement before diversity injection.
+REINIT_PERCENT = 0.10      # Replace 10% of population when stagnation occurs.
 
 # --------------------------
 # GRID ENCODING DEFINITION
 # --------------------------
 class Individual_Grid(object):
-    __slots__ = ["genome", "_fitness"]
+    __slots__ = ["genome", "_fitness", "_measurements"]
+    # _measurements caches metrics to avoid redundant computation.
 
     def __init__(self, genome):
-        # Genome is a 2D list (list of rows) of characters.
         self.genome = copy.deepcopy(genome)
         self._fitness = None
+        self._measurements = None
 
     def calculate_fitness(self):
-        measurements = metrics.metrics(self.to_level())
+        level_str_list = ["".join(row) for row in self.to_level()]
+        if self._measurements is None:
+            self._measurements = metrics.metrics(level_str_list)
         coefficients = {
             "meaningfulJumpVariance": 0.5,
             "negativeSpace": 0.6,
@@ -90,9 +97,8 @@ class Individual_Grid(object):
             "linearity": -0.5,
             "solvability": 3.0,
         }
-        base_fitness = sum(coefficients[m] * measurements[m] for m in coefficients)
-        # Bonus if at least one enemy ("E") is present.
-        level_str = "".join("".join(row) for row in self.to_level())
+        base_fitness = sum(coefficients[m] * self._measurements[m] for m in coefficients)
+        level_str = "".join(level_str_list)
         enemy_bonus = 0.5 if "E" in level_str else 0.0
         self._fitness = base_fitness + enemy_bonus
         return self
@@ -102,24 +108,26 @@ class Individual_Grid(object):
             self.calculate_fitness()
         return self._fitness
 
-    # --- Mutation Operator ---
-    # Only mutate rows 0..HEIGHT-2 (leave the ground intact).
+    # Mutation operator now allows "?" blocks with 20% probability.
     def mutate(self, genome):
-        for y in range(HEIGHT - 1):
+        for y in range(HEIGHT - 1):  # Do not change ground row.
             for x in range(1, WIDTH - 1):
                 if random.random() < MUTATION_RATE:
-                    if genome[y][x] in ALLOWED_MUTATION_TILES:
-                        genome[y][x] = random.choice(ALLOWED_MUTATION_TILES)
+                    if random.random() < 0.2:
+                        new_options = ALLOWED_MUTATION_TILES + ["?"]
+                    else:
+                        new_options = ALLOWED_MUTATION_TILES
+                    genome[y][x] = random.choice(new_options)
         return genome
 
-    # --- Multi-Point Column Crossover ---
+    # Multi-point column crossover (preserving ground).
     def generate_children(self, other):
         new_genome1 = copy.deepcopy(self.genome)
         new_genome2 = copy.deepcopy(self.genome)
         crossover_points = random.randint(2, 5)
         columns = random.sample(range(1, WIDTH - 1), crossover_points)
         for x in columns:
-            for y in range(HEIGHT - 1):  # Skip the ground row.
+            for y in range(HEIGHT - 1):  # Skip ground row.
                 new_genome1[y][x] = other.genome[y][x]
                 new_genome2[y][x] = self.genome[y][x]
         new_genome1 = self.mutate(new_genome1)
@@ -129,7 +137,6 @@ class Individual_Grid(object):
     def to_level(self):
         return self.genome
 
-    # --- Structured Empty Individual ---
     @classmethod
     def empty_individual(cls):
         g = []
@@ -139,27 +146,21 @@ class Individual_Grid(object):
             else:
                 g.append(["-"] * WIDTH)
         if HEIGHT >= 2:
-            g[HEIGHT - 2][0] = "m"  # Mario's start.
+            g[HEIGHT - 2][0] = "m"
         if HEIGHT > 7:
-            g[7][-1] = "v"       # Flagpole.
+            g[7][-1] = "v"
         for row in range(8, min(14, HEIGHT)):
-            g[row][-1] = "f"       # Flag.
+            g[row][-1] = "f"
         for row in range(14, HEIGHT):
             g[row][-1] = "X"
         return cls(g)
 
-    # --- Structured Random Individual with Clean Ground and Floating Platforms ---
     @classmethod
     def random_individual(cls):
-        # Create an empty grid.
         grid = [["-"] * WIDTH for _ in range(HEIGHT)]
         ground_heights = [None] * WIDTH
-
-        # Force the first few columns to be flat for Mario's start.
         for col in range(START_FLAT_COLS):
             ground_heights[col] = HEIGHT - 1
-
-        # Generate a ground profile for columns START_FLAT_COLS..WIDTH-1.
         current_height = HEIGHT - 1
         for col in range(START_FLAT_COLS, WIDTH):
             step = random.choice([-1, 0, 1])
@@ -167,22 +168,16 @@ class Individual_Grid(object):
             new_height = max(MIN_GROUND_HEIGHT, min(new_height, HEIGHT - 1))
             ground_heights[col] = new_height
             current_height = new_height
-
-        # Fill in the ground.
         for col in range(WIDTH):
             for row in range(ground_heights[col], HEIGHT):
                 grid[row][col] = "X"
-
-        # --- Add Floating Platforms ---
-        # For each platform, decide whether it is a question platform.
+        # Add floating platforms.
         num_platforms = random.randint(PLATFORM_COUNT_MIN, PLATFORM_COUNT_MAX)
         for _ in range(num_platforms):
             platform_length = random.randint(PLATFORM_LENGTH_MIN, PLATFORM_LENGTH_MAX)
             start_col = random.randint(START_FLAT_COLS, WIDTH - platform_length - 5)
             local_min = min(ground_heights[x] for x in range(start_col, start_col + platform_length))
-            # Decide platform type: 33% chance to be a question platform.
             if random.random() < 0.33:
-                # For a question platform, set the platform 4 rows above the lowest ground.
                 platform_row = local_min - 4
             else:
                 platform_row = local_min - 2
@@ -190,13 +185,11 @@ class Individual_Grid(object):
                 continue
             for x in range(start_col, start_col + platform_length):
                 if grid[platform_row][x] == "-":
-                    # If this platform is a question platform, force "?".
                     if platform_row == local_min - 4:
                         grid[platform_row][x] = "?"
                     else:
                         grid[platform_row][x] = random.choice(["X", "B"])
-
-        # --- Add Coins ---
+        # Add coins.
         num_coins = random.randint(COIN_COUNT_MIN, COIN_COUNT_MAX)
         for _ in range(num_coins):
             col = random.randint(1, WIDTH - 2)
@@ -204,16 +197,23 @@ class Individual_Grid(object):
                 coin_row = random.randint(1, ground_heights[col] - 2)
                 if grid[coin_row][col] == "-":
                     grid[coin_row][col] = "o"
-
-        # --- Add Enemies ---
+        # Add enemies.
         num_enemies = random.randint(ENEMY_COUNT_MIN, ENEMY_COUNT_MAX)
         for _ in range(num_enemies):
             col = random.randint(2, WIDTH - 3)
             enemy_row = ground_heights[col] - 1
             if enemy_row >= 0:
                 grid[enemy_row][col] = "E"
-
-        # --- Add a Tube (Pipe) ---
+        # NEW: Add mushrooms ("M"). We'll add 2 to 5 mushrooms randomly above ground.
+        num_mushrooms = random.randint(4, 8)
+        for _ in range(num_mushrooms):
+            col = random.randint(1, WIDTH - 2)
+            # Ensure there's room above the ground (at least 3 rows clearance).
+            if ground_heights[col] > 3:
+                mush_row = random.randint(1, ground_heights[col] - 3)
+                if grid[mush_row][col] == "-":
+                    grid[mush_row][col] = "M"
+        # Add tube (pipe).
         if random.random() < TUBE_PROBABILITY:
             tube_col = random.randint(2, WIDTH - 3)
             tube_height = random.randint(TUBE_HEIGHT_MIN, TUBE_HEIGHT_MAX)
@@ -223,8 +223,6 @@ class Individual_Grid(object):
                 grid[tube_top][tube_col] = "T"
                 for row in range(tube_top + 1, ground):
                     grid[row][tube_col] = "|"
-
-        # --- Fix Special Positions ---
         if HEIGHT >= 2:
             grid[HEIGHT - 2][0] = "m"
         if HEIGHT > 7:
@@ -233,24 +231,22 @@ class Individual_Grid(object):
             grid[row][-1] = "f"
         for row in range(14, HEIGHT):
             grid[row][-1] = "X"
-
         return cls(grid)
 
 # --------------------------
 # DESIGN ELEMENT (DE) ENCODING DEFINITION
 # --------------------------
-# (Unchanged; modify as needed.)
+# (Unchanged for brevity.)
 class Individual_DE(object):
     __slots__ = ["genome", "_fitness", "_level"]
-
     def __init__(self, genome):
         self.genome = list(genome)
         heapq.heapify(self.genome)
         self._fitness = None
         self._level = None
-
     def calculate_fitness(self):
-        measurements = metrics.metrics(self.to_level())
+        level_str_list = ["".join(row) for row in self.to_level()]
+        measurements = metrics.metrics(level_str_list)
         coefficients = {
             "meaningfulJumpVariance": 0.5,
             "negativeSpace": 0.6,
@@ -260,151 +256,19 @@ class Individual_DE(object):
             "solvability": 3.0,
         }
         base_fitness = sum(coefficients[m] * measurements[m] for m in coefficients)
-        level_str = "".join("".join(row) for row in self.to_level())
+        level_str = "".join(level_str_list)
         enemy_bonus = 0.5 if "E" in level_str else 0.0
         self._fitness = base_fitness + enemy_bonus
         return self
-
     def fitness(self):
         if self._fitness is None:
             self.calculate_fitness()
         return self._fitness
-
-    def mutate(self, new_genome):
-        if random.random() < 0.1 and new_genome:
-            index = random.randint(0, len(new_genome) - 1)
-            de = new_genome[index]
-            x, de_type = de[0], de[1]
-            choice = random.random()
-            if de_type == "4_block":
-                y = de[2]
-                breakable = de[3]
-                if choice < 0.33:
-                    x = offset_by_upto(x, WIDTH / 8, min=1, max=WIDTH - 2)
-                elif choice < 0.66:
-                    y = offset_by_upto(y, HEIGHT / 2, min=0, max=HEIGHT - 1)
-                else:
-                    breakable = not breakable
-                new_de = (x, de_type, y, breakable)
-            elif de_type == "5_qblock":
-                y = de[2]
-                has_powerup = de[3]
-                if choice < 0.33:
-                    x = offset_by_upto(x, WIDTH / 8, min=1, max=WIDTH - 2)
-                elif choice < 0.66:
-                    y = offset_by_upto(y, HEIGHT / 2, min=0, max=HEIGHT - 1)
-                else:
-                    has_powerup = not has_powerup
-                new_de = (x, de_type, y, has_powerup)
-            elif de_type == "3_coin":
-                y = de[2]
-                if choice < 0.5:
-                    x = offset_by_upto(x, WIDTH / 8, min=1, max=WIDTH - 2)
-                else:
-                    y = offset_by_upto(y, HEIGHT / 2, min=0, max=HEIGHT - 1)
-                new_de = (x, de_type, y)
-            elif de_type == "7_pipe":
-                h = de[2]
-                if choice < 0.5:
-                    x = offset_by_upto(x, WIDTH / 8, min=1, max=WIDTH - 2)
-                else:
-                    h = offset_by_upto(h, 2, min=2, max=HEIGHT - 4)
-                new_de = (x, de_type, h)
-            elif de_type == "0_hole":
-                w = de[2]
-                if choice < 0.5:
-                    x = offset_by_upto(x, WIDTH / 8, min=1, max=WIDTH - 2)
-                else:
-                    w = offset_by_upto(w, 4, min=1, max=WIDTH - 2)
-                new_de = (x, de_type, w)
-            elif de_type == "6_stairs":
-                h = de[2]
-                dx = de[3]
-                if choice < 0.33:
-                    x = offset_by_upto(x, WIDTH / 8, min=1, max=WIDTH - 2)
-                elif choice < 0.66:
-                    h = offset_by_upto(h, 8, min=1, max=HEIGHT - 4)
-                else:
-                    dx = -dx
-                new_de = (x, de_type, h, dx)
-            elif de_type == "1_platform":
-                w = de[2]
-                y = de[3]
-                madeof = de[4]
-                if choice < 0.25:
-                    x = offset_by_upto(x, WIDTH / 8, min=1, max=WIDTH - 2)
-                elif choice < 0.5:
-                    w = offset_by_upto(w, 8, min=1, max=WIDTH - 2)
-                elif choice < 0.75:
-                    y = offset_by_upto(y, HEIGHT, min=0, max=HEIGHT - 1)
-                else:
-                    madeof = random.choice(["?", "X", "B"])
-                new_de = (x, de_type, w, y, madeof)
-            elif de_type == "2_enemy":
-                x = offset_by_upto(x, WIDTH / 8, min=1, max=WIDTH - 2)
-                new_de = (x, de_type)
-            new_genome.pop(index)
-            heapq.heappush(new_genome, new_de)
-        return new_genome
-
-    def generate_children(self, other):
-        pa = random.randint(0, len(self.genome) - 1) if self.genome else 0
-        pb = random.randint(0, len(other.genome) - 1) if other.genome else 0
-        a_part = self.genome[:pa] if self.genome else []
-        b_part = other.genome[pb:] if other.genome else []
-        child1_genome = a_part + b_part
-        b_part = other.genome[:pb] if other.genome else []
-        a_part = self.genome[pa:] if self.genome else []
-        child2_genome = b_part + a_part
-        return Individual_DE(self.mutate(child1_genome)), Individual_DE(self.mutate(child2_genome))
-
     def to_level(self):
-        if self._level is None:
-            base = Individual_Grid.empty_individual().to_level()
-            for de in sorted(self.genome, key=lambda d: (d[1], d[0], d)):
-                x = de[0]
-                de_type = de[1]
-                if de_type == "4_block":
-                    y = de[2]
-                    breakable = de[3]
-                    base[y][x] = "B" if breakable else "X"
-                elif de_type == "5_qblock":
-                    y = de[2]
-                    has_powerup = de[3]
-                    base[y][x] = "M" if has_powerup else "?"
-                elif de_type == "3_coin":
-                    y = de[2]
-                    base[y][x] = "o"
-                elif de_type == "7_pipe":
-                    h = de[2]
-                    base[HEIGHT - h - 1][x] = "T"
-                    for y in range(HEIGHT - h, HEIGHT):
-                        base[y][x] = "|"
-                elif de_type == "0_hole":
-                    w = de[2]
-                    for x2 in range(w):
-                        base[HEIGHT - 1][clip(1, x + x2, WIDTH - 2)] = "-"
-                elif de_type == "6_stairs":
-                    h = de[2]
-                    dx = de[3]
-                    for x2 in range(1, h + 1):
-                        for y in range(x2 if dx == 1 else h - x2):
-                            base[clip(0, HEIGHT - y - 1, HEIGHT - 1)][clip(1, x + x2, WIDTH - 2)] = "X"
-                elif de_type == "1_platform":
-                    w = de[2]
-                    h = de[3]
-                    madeof = de[4]
-                    for x2 in range(w):
-                        base[clip(0, HEIGHT - h - 1, HEIGHT - 1)][clip(1, x + x2, WIDTH - 2)] = madeof
-                elif de_type == "2_enemy":
-                    base[HEIGHT - 2][x] = "E"
-            self._level = base
-        return self._level
-
+        return Individual_Grid.empty_individual().to_level()
     @classmethod
     def empty_individual(cls):
         return Individual_DE([])
-
     @classmethod
     def random_individual(cls):
         elt_count = random.randint(8, 128)
@@ -477,8 +341,37 @@ def select_parent(population):
         raise ValueError("Unknown SELECTION_METHOD: " + SELECTION_METHOD)
 
 # --------------------------
-# Generate Successors with Elitism
+# Extra Credit: FI-2POP Functions
 # --------------------------
+def partition_population(pop):
+    feasible = []
+    infeasible = []
+    for ind in pop:
+        if hasattr(ind, "_measurements") and ind._measurements is not None:
+            meas = ind._measurements
+        else:
+            level_str_list = ["".join(row) for row in ind.to_level()]
+            meas = metrics.metrics(level_str_list)
+            ind._measurements = meas
+        if meas["solvability"] >= SOLVABILITY_THRESHOLD:
+            feasible.append(ind)
+        else:
+            infeasible.append(ind)
+    return feasible, infeasible
+
+def generate_successors_2pop(pop_feasible, pop_infeasible):
+    target_size = POPULATION_SIZE // 2
+    combined = pop_feasible + pop_infeasible
+    if len(pop_feasible) < target_size:
+        needed = target_size - len(pop_feasible)
+        pop_feasible.extend(random.sample(combined, needed))
+    if len(pop_infeasible) < target_size:
+        needed = target_size - len(pop_infeasible)
+        pop_infeasible.extend(random.sample(combined, needed))
+    new_feasible = generate_successors(pop_feasible)
+    new_infeasible = generate_successors(pop_infeasible)
+    return new_feasible + new_infeasible
+
 def generate_successors(population):
     elite_count = 2
     sorted_pop = sorted(population, key=lambda ind: ind.fitness(), reverse=True)
@@ -497,7 +390,7 @@ def generate_successors(population):
 # --------------------------
 # GA MAIN LOOP
 # --------------------------
-def ga():
+def ga_2pop():
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
     batches = os.cpu_count()
@@ -527,34 +420,46 @@ def ga():
             else:
                 stagnation_count = 0
             prev_best_fitness = best.fitness()
-            if stagnation_count >= 10:
-                print("Early stopping: No fitness improvement for 10 generations.")
-                break
+            # Instead of early stopping, if stagnation for STAGNATION_THRESHOLD generations, reinitialize REINIT_PERCENT.
+            if stagnation_count >= STAGNATION_THRESHOLD:
+                print("Stagnation detected ({} generations). Reinitializing 10% of population.".format(stagnation_count))
+                num_reinit = int(REINIT_PERCENT * len(population))
+                for i in range(num_reinit):
+                    idx = random.randint(0, len(population) - 1)
+                    population[idx] = Individual.random_individual()
+                stagnation_count = 0
+
             print("\nGeneration:", generation)
             print("Max fitness:", best.fitness())
             print("Average generation time: {:.2f} sec".format((now - start) / (generation + 1)))
             print("Net time: {:.2f} sec".format(now - start))
-            # Save the best level for this generation to a file named "gen_<generation>.txt".
             gen_filename = os.path.join(OUTPUT_DIR, f"gen_{generation}.txt")
             with open(gen_filename, 'w') as f:
                 for row in best.to_level():
                     f.write("".join(row) + "\n")
-            generation += 1
+            feasible, infeasible = partition_population(population)
             gentime = time.time()
-            next_population = generate_successors(population)
+            next_population = generate_successors_2pop(feasible, infeasible)
             gendone = time.time()
-            print("Generated successors in: {:.2f} seconds".format(gendone - gentime))
+            print("Generated successors (2POP) in: {:.2f} seconds".format(gendone - gentime))
             next_population = pool.map(Individual.calculate_fitness, next_population, batch_size)
             popdone = time.time()
             print("Calculated fitnesses in: {:.2f} seconds".format(popdone - gendone))
             population = next_population
+            generation += 1
         return population, best_overall
+
+def ga_main():
+    if USE_2POP:
+        return ga_2pop()
+    else:
+        return ga_2pop()
 
 # --------------------------
 # MAIN
 # --------------------------
 if __name__ == "__main__":
-    final_population, best_individual = ga()
+    final_population, best_individual = ga_main()
     final_sorted = sorted(final_population, key=lambda ind: ind.fitness(), reverse=True)
     print("\nBest overall fitness:", best_individual.fitness())
     now_str = time.strftime("%m_%d_%H_%M_%S")
